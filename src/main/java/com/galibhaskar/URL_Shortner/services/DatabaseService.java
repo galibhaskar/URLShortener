@@ -13,10 +13,13 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
+import javax.swing.text.DateFormatter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.security.SecureRandom;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -46,12 +49,21 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
     private String databaseFilePath;
 
     @Override
-    public List<ShortURL> getAllShortURLs() {
-        return null;
+    public ShortURL getURLInfo(String shortURL) throws Exception {
+        Optional<ShortURL> shortURLResult = this.data.stream()
+                .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
+                .findFirst();
+
+        if (shortURLResult.isPresent())
+            return shortURLResult.get();
+
+        throw new Exception("URL not found");
     }
 
     @Override
-    public String getLongURL(String shortURL) {
+    public String getLongURL(String shortURL) throws Exception {
+        Date currentDate = new Date();
+
         Optional<ShortURL> result = this.data.stream()
                 .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
                 .findFirst();
@@ -59,8 +71,14 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
         if (result.isEmpty())
             throw new NoSuchElementException();
 
-//        else if(result.isPresent() && result.get().getExpiryDate())
-//            throw new IOException();
+        String expiryDate = result.get().getExpiryDate();
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd-yyyy");
+
+        Date convertedExpiryDate = dateFormat.parse(expiryDate);
+
+        if (currentDate.after(convertedExpiryDate))
+            throw new Exception("URL expired");
 
         return result.get().getLongURL();
     }
@@ -86,12 +104,47 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
             }
         });
 
+        writeToCSV(this.data);
+
         return updateSuccess.get();
     }
 
+    private void updateDate(String shortURL, String date) {
+        this.data.forEach(_urlItem -> {
+            if (Objects.equals(_urlItem.getShortCode(), shortURL)) {
+                _urlItem.setExpiryDate(date);
+            }
+        });
+    }
+
     @Override
-    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) {
-        return false;
+    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) throws ParseException {
+        Optional<ShortURL> result = this.data.stream()
+                .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
+                .findFirst();
+
+        if (result.isEmpty())
+            throw new NoSuchElementException();
+
+        String expiryDate = result.get().getExpiryDate();
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd-yyyy");
+
+        Date convertedExpiryDate = dateFormat.parse(expiryDate);
+
+        Calendar calendar = Calendar.getInstance();
+
+        calendar.setTime(convertedExpiryDate);
+
+        calendar.add(Calendar.DAY_OF_MONTH, daysToAddToExpiryDate);
+
+        Date newDate = calendar.getTime();
+
+        updateDate(shortURL, dateFormat.format(newDate));
+
+        writeToCSV(this.data);
+
+        return true;
     }
 
     public void addItemToCSV(ShortURL newItem) throws Exception {
@@ -141,7 +194,8 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
             FileReader reader = new FileReader(databaseFile);
 
             CsvToBean<ShortURL> csvToBean = new CsvToBeanBuilder<ShortURL>(reader)
-                    .withType(ShortURL.class).build();
+                    .withType(ShortURL.class)
+                    .build();
 
             data = csvToBean.parse();
 

@@ -17,9 +17,11 @@ import java.util.NoSuchElementException;
 
 @RestController
 public class AppController {
+    private final DatabaseService databaseService;
 
-    @Autowired
-    private DatabaseService databaseService;
+    public AppController(@Autowired DatabaseService databaseService) {
+        this.databaseService = databaseService;
+    }
 
     @RequestMapping(path = "/{shortURL}", method = RequestMethod.GET)
     public String redirectToLongURL(HttpServletResponse response, @PathVariable String shortURL) {
@@ -38,7 +40,7 @@ public class AppController {
     }
 
     @RequestMapping(path = "/info/{shortURL}", method = RequestMethod.GET)
-    public ShortURL getShortURLInfo(HttpServletResponse response, @PathVariable String shortURL) {
+    public ShortURL getShortURLInfo(@PathVariable String shortURL) {
         try {
             return databaseService.getURLInfo(shortURL);
         } catch (Exception e) {
@@ -77,7 +79,7 @@ public class AppController {
     }
 
     @RequestMapping(path = "/updateExpiry", method = RequestMethod.PATCH)
-    public String updateExpiryofShortCode(HttpServletResponse response,
+    public String updateExpiryOfShortCode(HttpServletResponse response,
                                           @RequestBody ItemBody body) throws IOException, ParseException {
 
         boolean updateStatus = databaseService.updateExpiry(body.shortURL, body.daysToAdd);

@@ -1,11 +1,8 @@
 package com.galibhaskar.URL_Shortner.concerns;
 
 import com.galibhaskar.URL_Shortner.models.ShortURL;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.text.ParseException;
-import java.util.Date;
-import java.util.List;
 
 public interface IDatabaseService {
     ShortURL getURLInfo(String shortURL) throws Exception;

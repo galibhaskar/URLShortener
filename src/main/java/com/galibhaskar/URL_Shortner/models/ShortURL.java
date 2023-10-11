@@ -1,9 +1,17 @@
 package com.galibhaskar.URL_Shortner.models;
 
 import com.opencsv.bean.CsvBindByName;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.Date;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ShortURL {
     @CsvBindByName(column = "longURL")
     private String longURL;
@@ -13,37 +21,4 @@ public class ShortURL {
 
     @CsvBindByName(column = "expiryDate")
     private String expiryDate;
-
-    public ShortURL() {
-    }
-
-    public ShortURL(String longURL, String shortCode, String expiryDate) {
-        this.longURL = longURL;
-        this.shortCode = shortCode;
-        this.expiryDate = expiryDate;
-    }
-
-    public String getLongURL() {
-        return longURL;
-    }
-
-    public void setLongURL(String longURL) {
-        this.longURL = longURL;
-    }
-
-    public String getShortCode() {
-        return shortCode;
-    }
-
-    public void setShortCode(String shortCode) {
-        this.shortCode = shortCode;
-    }
-
-    public String getExpiryDate() {
-        return expiryDate;
-    }
-
-    public void setExpiryDate(String expiryDate) {
-        this.expiryDate = expiryDate;
-    }
 }

@@ -3,29 +3,29 @@ package com.galibhaskar.URL_Shortner.services;
 import com.galibhaskar.URL_Shortner.concerns.ICSVService;
 import com.galibhaskar.URL_Shortner.concerns.IHelperService;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
-import com.galibhaskar.URL_Shortner.concerns.IDatabaseService;
+import com.galibhaskar.URL_Shortner.concerns.IURLService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import java.text.ParseException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
-public class DatabaseService implements IDatabaseService, ApplicationRunner {
+public class URLService implements IURLService, ApplicationRunner {
     final ICSVService csvService;
 
     final IHelperService helperService;
 
     List<ShortURL> data;
 
-    private static final int SHORT_CODE_LENGTH = 5;
+    @Value("${shortCodeLength:5}")
+    private int SHORT_CODE_LENGTH;
 
-
-    public DatabaseService(@Autowired ICSVService csvService,
-                           @Autowired IHelperService helperService) {
+    public URLService(@Autowired ICSVService csvService,
+                      @Autowired IHelperService helperService) {
         this.csvService = csvService;
         this.helperService = helperService;
     }
@@ -51,21 +51,27 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
                 .findFirst();
 
         if (result.isEmpty())
-            throw new NoSuchElementException();
+            throw new RuntimeException("URL Not Found");
 
         String expiryDate = result.get().getExpiryDate();
 
         Date convertedExpiryDate = helperService.parseDateString(expiryDate);
 
         if (currentDate.after(convertedExpiryDate))
-            throw new Exception("URL expired");
+            throw new RuntimeException("URL Expired");
 
         return result.get().getLongURL();
     }
 
     @Override
-    public String createShortURL(String longURL, String expiry) throws Exception {
-        String shortCode = helperService.generateRandomString(SHORT_CODE_LENGTH);
+    public String createShortURL(String longURL, String expiry, String customShortCode)
+            throws Exception {
+
+        String shortCode;
+        if (customShortCode == null)
+            shortCode = helperService.generateRandomString(SHORT_CODE_LENGTH);
+        else
+            shortCode = customShortCode;
 
         ShortURL shortURL = new ShortURL(longURL, shortCode, expiry);
 
@@ -77,7 +83,7 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
     }
 
     @Override
-    public boolean updateShortURL(String shortURL, String longURL) {
+    public boolean updateShortURL(String shortURL, String longURL) throws Exception {
         AtomicBoolean updateSuccess = new AtomicBoolean(false);
 
         this.data.forEach(_urlItem -> {
@@ -93,15 +99,14 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
         return updateSuccess.get();
     }
 
-
     @Override
-    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) throws ParseException {
+    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) throws Exception {
         Optional<ShortURL> result = this.data.stream()
                 .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
                 .findFirst();
 
         if (result.isEmpty())
-            throw new NoSuchElementException();
+            throw new Exception("URL not found");
 
         String expiryDate = result.get().getExpiryDate();
 
@@ -118,6 +123,21 @@ public class DatabaseService implements IDatabaseService, ApplicationRunner {
         return true;
     }
 
+    @Override
+    public void deleteExpiredURLs() throws Exception {
+        this.data = this.data.stream().filter(_url -> {
+            Date urlExpiry = null;
+            try {
+                urlExpiry = helperService.parseDateString(_url.getExpiryDate());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            Date currentDate = new Date();
+            return !currentDate.after(urlExpiry);
+        }).toList();
+
+        csvService.writeToCSV(this.data);
+    }
 
     @Override
     public void run(ApplicationArguments args) throws Exception {

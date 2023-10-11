@@ -1,94 +1,96 @@
 package com.galibhaskar.URL_Shortner.controllers;
 
 import com.galibhaskar.URL_Shortner.models.ItemBody;
-import com.galibhaskar.URL_Shortner.models.RequestItem;
+import com.galibhaskar.URL_Shortner.models.PremiumBody;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
-import com.galibhaskar.URL_Shortner.services.DatabaseService;
+import com.galibhaskar.URL_Shortner.services.URLService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.text.ParseException;
-import java.util.NoSuchElementException;
 
 @RestController
 public class AppController {
-    private final DatabaseService databaseService;
+    private final URLService URLService;
 
-    public AppController(@Autowired DatabaseService databaseService) {
-        this.databaseService = databaseService;
+    public AppController(@Autowired URLService URLService) {
+        this.URLService = URLService;
     }
 
     @RequestMapping(path = "/{shortURL}", method = RequestMethod.GET)
-    public String redirectToLongURL(HttpServletResponse response, @PathVariable String shortURL) {
-        try {
-            String longURL = databaseService.getLongURL(shortURL);
+    public void redirectToLongURL(HttpServletResponse response, @PathVariable String shortURL)
+            throws Exception {
+        String longURL = URLService.getLongURL(shortURL);
 
-            response.sendRedirect(longURL);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Url not found", e);
-        } catch (Exception e) {
-            return e.toString();
-        }
-
-        return "";
+        response.sendRedirect(longURL);
     }
 
     @RequestMapping(path = "/info/{shortURL}", method = RequestMethod.GET)
-    public ShortURL getShortURLInfo(@PathVariable String shortURL) {
-        try {
-            return databaseService.getURLInfo(shortURL);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Url not found", e);
-        }
+    public ResponseEntity<ShortURL> getShortURLInfo(@PathVariable String shortURL)
+            throws Exception {
+        return new ResponseEntity<>(URLService.getURLInfo(shortURL), HttpStatus.OK);
     }
 
-    @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = "application/json")
-    public String createShortCode(HttpServletRequest request, HttpServletResponse response,
-                                  @RequestBody RequestItem requestItem) throws Exception {
+    @RequestMapping(path = "/create", method = RequestMethod.POST,
+            consumes = "application/json")
+    public ResponseEntity<String> createShortCode(HttpServletRequest request,
+                                                  @RequestBody ShortURL body)
+            throws Exception {
+
+        String currentHostName = request.getScheme() + "://" +
+                request.getHeader("Host") + "/";
+
+        String shortCode = URLService.createShortURL(
+                body.getLongURL(),
+                body.getExpiryDate(),
+                null);
+
+        return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
+    }
+
+    @RequestMapping(path = "/premium/create", method = RequestMethod.POST, consumes = "application/json")
+    public ResponseEntity<String> createPremiumShortCode(HttpServletRequest request,
+                                                         HttpServletResponse response,
+                                                         @RequestBody PremiumBody premiumBody)
+            throws Exception {
 
         String currentHostName = request.getScheme() + "://" + request.getHeader("Host") + "/";
 
-        String shortCode = databaseService.createShortURL(requestItem.longURL, requestItem.expiryDate);
+        String shortCode = URLService.createShortURL(
+                premiumBody.getDestinationUrl(),
+                premiumBody.getExpiryDate(),
+                premiumBody.getSlashTag());
 
-        if (shortCode.isEmpty()) {
-            throw new Exception("Short code empty");
-        } else {
-            response.setStatus(200);
-            return currentHostName + shortCode;
-        }
+        return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
     }
 
     @RequestMapping(path = "/updateURL", method = RequestMethod.PATCH)
-    public String updateLongURLofShortCode(HttpServletResponse response,
-                                           @RequestBody ShortURL body) throws IOException {
+    public ResponseEntity<String> updateLongURLofShortCode(HttpServletResponse response,
+                                                           @RequestBody ShortURL body) throws Exception {
 
-        boolean updateStatus = databaseService.updateShortURL(body.getShortCode(), body.getLongURL());
+        boolean updateStatus = URLService.updateShortURL(body.getShortCode(), body.getLongURL());
 
-        if (updateStatus) {
-            response.setStatus(200);
-            return "Update success";
-        } else
-            throw new IOException("Something went wrong");
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("URL Update Success");
+
+        else
+            throw new Exception("URL Update Failed");
     }
 
     @RequestMapping(path = "/updateExpiry", method = RequestMethod.PATCH)
-    public String updateExpiryOfShortCode(HttpServletResponse response,
-                                          @RequestBody ItemBody body) throws IOException, ParseException {
+    public ResponseEntity<String> updateExpiryOfShortCode(HttpServletResponse response,
+                                                          @RequestBody ItemBody body) throws Exception {
 
-        boolean updateStatus = databaseService.updateExpiry(body.shortURL, body.daysToAdd);
+        boolean updateStatus = URLService.updateExpiry(body.shortURL, body.daysToAdd);
 
-        if (updateStatus) {
-            response.setStatus(200);
-            return "updated expiry successfully";
-        } else
-            throw new IOException("Something went wrong");
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");
+
+        else
+            throw new Exception("Expiry Update Failed");
     }
 
 }

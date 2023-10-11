@@ -1,7 +1,16 @@
 package com.galibhaskar.URL_Shortner.models;
 
-public class ItemBody {
-    public String shortURL;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-    public int daysToAdd;
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class ItemBody {
+    private String shortURL;
+
+    private int daysToAdd;
 }

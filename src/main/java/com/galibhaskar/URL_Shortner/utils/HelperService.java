@@ -68,40 +68,35 @@ public class HelperService implements IHelperService {
     }
 
     @Override
-    public String extractRequestBody(ContentCachingRequestWrapper requestWrapper) throws IOException {
-//        BufferedReader bufferedReader = null;
-//        StringBuilder requestBody = new StringBuilder();
-//
-//        try {
-//            InputStream inputStream = requestWrapper.getInputStream();
-//            bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-//            String line;
-//            while ((line = bufferedReader.readLine()) != null) {
-//                requestBody.append(line);
-//            }
-//        } finally {
-//            if (bufferedReader != null) {
-//                try {
-//                    bufferedReader.close();
-//                } catch (IOException e) {
-//                    // Log or handle the exception as needed
-//                    System.out.println("Error closing BufferedReader: " + e);
-//                }
-//            }
-//        }
-//        return requestBody.toString();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(requestWrapper.getInputStream()))) {
-            StringBuilder requestBody = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                requestBody.append(line);
+    public String extractRequestBody(HttpServletRequest request) throws IOException {
+        BufferedReader bufferedReader = null;
+        StringBuilder requestBody = new StringBuilder();
+
+        try {
+            InputStream inputStream = request.getInputStream();
+            if (inputStream != null) {
+                bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+                char[] charBuffer = new char[128];
+                int bytesRead = -1;
+                while ((bytesRead = bufferedReader.read(charBuffer)) > 0) {
+                    requestBody.append(charBuffer, 0, bytesRead);
+                }
             }
-            return requestBody.toString();
-        } catch (IOException e) {
-            // Handle the exception
-            e.printStackTrace();
-            return "";
+        } catch (IOException ex) {
+//            throw ex;
+            System.out.println(ex);
+        } finally {
+            if (bufferedReader != null) {
+                try {
+                    bufferedReader.close();
+                } catch (IOException e) {
+                    // Log or handle the exception as needed
+                    System.out.println("Error closing BufferedReader: " + e);
+//                    throw e;
+                }
+            }
         }
+        return requestBody.toString();
     }
 
     @Override

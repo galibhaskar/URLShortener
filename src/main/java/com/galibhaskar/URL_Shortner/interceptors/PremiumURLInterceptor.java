@@ -6,6 +6,7 @@ import com.galibhaskar.URL_Shortner.models.PremiumBody;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -15,7 +16,11 @@ import java.util.Objects;
 
 @Component
 public class PremiumURLInterceptor implements HandlerInterceptor {
-    private IHelperService helperService;
+    private final IHelperService helperService;
+
+    public PremiumURLInterceptor(@Autowired IHelperService helperService) {
+        this.helperService = helperService;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request,
@@ -24,15 +29,16 @@ public class PremiumURLInterceptor implements HandlerInterceptor {
 
         System.out.println("premium URL interceptor pre-handle");
 
-//        String requestBody = helperService.extractRequestBody(request);
+        String requestBody = helperService.extractRequestBody(request);
 
-//        PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
+        PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
 
-//        request.setAttribute("isUserValid",
-//                Objects.equals(deserializedBody.getUserType(), "pro"));
+        if (!Objects.equals(deserializedBody.getUserType(), "pro")) {
+            response.sendError(HttpStatus.FORBIDDEN.value(), "Not a Premium User");
+            return false;
+        }
 
-//        if (Objects.equals(deserializedBody.getUserType(), "pro"))
-//            response.sendError(HttpStatus.FORBIDDEN.value(), "Not a Premium User");
+        request.setAttribute("requestBody", requestBody);
 
         return true;
 

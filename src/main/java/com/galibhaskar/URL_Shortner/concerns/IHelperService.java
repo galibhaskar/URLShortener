@@ -21,7 +21,7 @@ public interface IHelperService {
 
     String getExtendedDate(String expiryDate, int daysToAddToExpiryDate) throws Exception;
 
-    String extractRequestBody(ContentCachingRequestWrapper requestWrapper) throws IOException;
+    String extractRequestBody(HttpServletRequest request) throws IOException;
 
     <T> T deserializeJSONString(String json, Class<T> className) throws Exception;
 }

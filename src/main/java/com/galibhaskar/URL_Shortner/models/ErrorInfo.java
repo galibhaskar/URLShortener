@@ -26,19 +26,6 @@ public class ErrorInfo {
         timeStamp = LocalDateTime.now();
     }
 
-    public ErrorInfo(HttpStatus status) {
-        this();
-        this.status = status;
-    }
-
-    public ErrorInfo(HttpStatus status, Throwable ex) {
-        this();
-
-        this.status = status;
-        this.message = "unexpected error";
-        this.debugMessage = ex.getLocalizedMessage();
-    }
-
 
     public ErrorInfo(HttpStatus status, String message, Throwable ex) {
         this();

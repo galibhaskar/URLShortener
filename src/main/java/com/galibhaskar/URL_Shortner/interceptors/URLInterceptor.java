@@ -33,25 +33,9 @@ public class URLInterceptor implements HandlerInterceptor {
             throws Exception {
         System.out.println("interceptor pre-handle");
 
-//        ContentCachingRequestWrapper requestWrapper = new ContentCachingRequestWrapper(request);
+        String requestBody = helperService.extractRequestBody(request);
 
-//        String requestBody = helperService.extractRequestBody(requestWrapper);
-
-//        ShortURL deserializedBody = helperService.deserializeJSONString(requestBody, ShortURL.class);
-
-//        request.setAttribute("isLongURLPresent",
-//                deserializedBody.getLongURL() != null &&
-//                        !deserializedBody.getLongURL().isEmpty());
-//
-//        request.setAttribute("isShortCodePresent",
-//                deserializedBody.getShortCode() != null &&
-//                        !deserializedBody.getShortCode().isEmpty());
-//
-//        request.setAttribute("isExpiryPresent",
-//                deserializedBody.getExpiryDate() != null &&
-//                        !deserializedBody.getExpiryDate().isEmpty());
-
-//        request.setAttribute("requestBody", deserializedBody);
+        request.setAttribute("requestBody", requestBody);
 
         return true;
 

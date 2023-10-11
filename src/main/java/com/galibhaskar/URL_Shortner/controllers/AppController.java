@@ -4,6 +4,7 @@ import com.galibhaskar.URL_Shortner.models.ItemBody;
 import com.galibhaskar.URL_Shortner.models.PremiumBody;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
 import com.galibhaskar.URL_Shortner.services.URLService;
+import com.galibhaskar.URL_Shortner.utils.HelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +16,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 public class AppController {
     private final URLService URLService;
+    private final HelperService helperService;
 
-    public AppController(@Autowired URLService URLService) {
+    public AppController(@Autowired URLService URLService,
+                         @Autowired HelperService helperService) {
         this.URLService = URLService;
+        this.helperService = helperService;
     }
 
     @RequestMapping(path = "/{shortURL}", method = RequestMethod.GET)
@@ -37,15 +41,21 @@ public class AppController {
     @RequestMapping(path = "/create", method = RequestMethod.POST,
             consumes = "application/json")
     public ResponseEntity<String> createShortCode(HttpServletRequest request,
-                                                  @RequestBody ShortURL body)
+                                                  @RequestAttribute String requestBody)
             throws Exception {
 
         String currentHostName = request.getScheme() + "://" +
                 request.getHeader("Host") + "/";
 
+        ShortURL deserializedBody = helperService.deserializeJSONString(requestBody, ShortURL.class);
+
+        if (deserializedBody.getLongURL().isEmpty() ||
+                deserializedBody.getExpiryDate().isEmpty())
+            throw new Exception("One or more required fields are empty");
+
         String shortCode = URLService.createShortURL(
-                body.getLongURL(),
-                body.getExpiryDate(),
+                deserializedBody.getLongURL(),
+                deserializedBody.getExpiryDate(),
                 null);
 
         return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
@@ -53,25 +63,37 @@ public class AppController {
 
     @RequestMapping(path = "/premium/create", method = RequestMethod.POST, consumes = "application/json")
     public ResponseEntity<String> createPremiumShortCode(HttpServletRequest request,
-                                                         HttpServletResponse response,
-                                                         @RequestBody PremiumBody premiumBody)
+                                                         @RequestAttribute String requestBody)
             throws Exception {
 
         String currentHostName = request.getScheme() + "://" + request.getHeader("Host") + "/";
 
+        PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
+
+        if (deserializedBody.getDestinationUrl().isEmpty() ||
+                deserializedBody.getExpiryDate().isEmpty() ||
+                deserializedBody.getSlashTag().isEmpty())
+            throw new Exception("One or more required fields are empty");
+
         String shortCode = URLService.createShortURL(
-                premiumBody.getDestinationUrl(),
-                premiumBody.getExpiryDate(),
-                premiumBody.getSlashTag());
+                deserializedBody.getDestinationUrl(),
+                deserializedBody.getExpiryDate(),
+                deserializedBody.getSlashTag());
 
         return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
     }
 
     @RequestMapping(path = "/updateURL", method = RequestMethod.PATCH)
-    public ResponseEntity<String> updateLongURLofShortCode(HttpServletResponse response,
-                                                           @RequestBody ShortURL body) throws Exception {
+    public ResponseEntity<String> updateLongURLofShortCode(@RequestAttribute String requestBody)
+            throws Exception {
+        ShortURL deserializedBody = helperService.deserializeJSONString(requestBody, ShortURL.class);
 
-        boolean updateStatus = URLService.updateShortURL(body.getShortCode(), body.getLongURL());
+        if (deserializedBody.getShortCode().isEmpty() ||
+                deserializedBody.getLongURL().isEmpty())
+            throw new Exception("One or more required fields are empty");
+
+        boolean updateStatus = URLService.updateShortURL(deserializedBody.getShortCode(),
+                deserializedBody.getLongURL());
 
         if (updateStatus)
             return ResponseEntity.status(HttpStatus.OK).body("URL Update Success");
@@ -81,10 +103,16 @@ public class AppController {
     }
 
     @RequestMapping(path = "/updateExpiry", method = RequestMethod.PATCH)
-    public ResponseEntity<String> updateExpiryOfShortCode(HttpServletResponse response,
-                                                          @RequestBody ItemBody body) throws Exception {
+    public ResponseEntity<String> updateExpiryOfShortCode(@RequestAttribute String requestBody)
+            throws Exception {
 
-        boolean updateStatus = URLService.updateExpiry(body.shortURL, body.daysToAdd);
+        ItemBody body = helperService.deserializeJSONString(requestBody, ItemBody.class);
+
+        if (body.getShortURL().isEmpty() ||
+                body.getDaysToAdd() == 0)
+            throw new Exception("One or more required fields are empty");
+
+        boolean updateStatus = URLService.updateExpiry(body.getShortURL(), body.getDaysToAdd());
 
         if (updateStatus)
             return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");

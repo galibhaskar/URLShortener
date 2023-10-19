@@ -5,12 +5,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ItemBody {
-    private String shortURL;
+public class PremiumBody {
+    private String destinationUrl;
 
-    private int daysToAdd;
+    private String slashTag;
+
+    private String userType;
 }

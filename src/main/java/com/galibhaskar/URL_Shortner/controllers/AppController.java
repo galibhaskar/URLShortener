@@ -1,92 +1,141 @@
 package com.galibhaskar.URL_Shortner.controllers;
 
 import com.galibhaskar.URL_Shortner.models.ItemBody;
-import com.galibhaskar.URL_Shortner.models.RequestItem;
+import com.galibhaskar.URL_Shortner.models.PremiumBody;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
-import com.galibhaskar.URL_Shortner.services.DatabaseService;
+import com.galibhaskar.URL_Shortner.services.URLService;
+import com.galibhaskar.URL_Shortner.utils.HelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.text.ParseException;
-import java.util.NoSuchElementException;
+import java.util.LinkedHashMap;
 
 @RestController
 public class AppController {
+    private final URLService URLService;
+    private final HelperService helperService;
 
-    @Autowired
-    private DatabaseService databaseService;
+    public AppController(@Autowired URLService URLService,
+                         @Autowired HelperService helperService) {
+        this.URLService = URLService;
+        this.helperService = helperService;
+    }
 
     @RequestMapping(path = "/{shortURL}", method = RequestMethod.GET)
-    public String redirectToLongURL(HttpServletResponse response, @PathVariable String shortURL) {
-        try {
-            String longURL = databaseService.getLongURL(shortURL);
+    public void redirectToLongURL(HttpServletResponse response, @PathVariable String shortURL)
+            throws Exception {
+        String longURL = URLService.getLongURL(shortURL);
 
-            response.sendRedirect(longURL);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Url not found", e);
-        } catch (Exception e) {
-            return e.toString();
-        }
-
-        return "";
+        response.sendRedirect(longURL);
     }
 
     @RequestMapping(path = "/info/{shortURL}", method = RequestMethod.GET)
-    public ShortURL getShortURLInfo(HttpServletResponse response, @PathVariable String shortURL) {
-        try {
-            return databaseService.getURLInfo(shortURL);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Url not found", e);
-        }
+    public ResponseEntity<ShortURL> getShortURLInfo(@PathVariable String shortURL)
+            throws Exception {
+        return new ResponseEntity<>(URLService.getURLInfo(shortURL), HttpStatus.OK);
     }
 
-    @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = "application/json")
-    public String createShortCode(HttpServletRequest request, HttpServletResponse response,
-                                  @RequestBody RequestItem requestItem) throws Exception {
+    @RequestMapping(path = "/create", method = RequestMethod.POST,
+            consumes = "application/json")
+    public ResponseEntity<String> createShortCode(HttpServletRequest request,
+                                                  @RequestAttribute String requestBody)
+            throws Exception {
+
+        String currentHostName = request.getScheme() + "://" +
+                request.getHeader("Host") + "/";
+
+        LinkedHashMap<String, String> map = helperService.deserializeJSONString(requestBody, LinkedHashMap.class);
+
+        String longURL = map.get("longURL");
+
+        if (longURL.isEmpty())
+            throw new Exception("longURL empty");
+
+        String shortCode = URLService.createShortURL(longURL, null);
+
+        return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
+    }
+
+    @RequestMapping(path = "/premium/create", method = RequestMethod.POST, consumes = "application/json")
+    public ResponseEntity<String> createPremiumShortCode(HttpServletRequest request,
+                                                         @RequestAttribute String requestBody)
+            throws Exception {
 
         String currentHostName = request.getScheme() + "://" + request.getHeader("Host") + "/";
 
-        String shortCode = databaseService.createShortURL(requestItem.longURL, requestItem.expiryDate);
+        PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
 
-        if (shortCode.isEmpty()) {
-            throw new Exception("Short code empty");
-        } else {
-            response.setStatus(200);
-            return currentHostName + shortCode;
-        }
+        if (deserializedBody.getDestinationUrl().isEmpty() ||
+                deserializedBody.getSlashTag().isEmpty())
+            throw new Exception("One or more required fields are empty");
+
+        String shortCode = URLService.createShortURL(
+                deserializedBody.getDestinationUrl(),
+                deserializedBody.getSlashTag());
+
+        return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
     }
 
     @RequestMapping(path = "/updateURL", method = RequestMethod.PATCH)
-    public String updateLongURLofShortCode(HttpServletResponse response,
-                                           @RequestBody ShortURL body) throws IOException {
+    public ResponseEntity<String> updateLongURLofShortCode(@RequestAttribute String requestBody)
+            throws Exception {
+        ShortURL deserializedBody = helperService.deserializeJSONString(requestBody, ShortURL.class);
 
-        boolean updateStatus = databaseService.updateShortURL(body.getShortCode(), body.getLongURL());
+        if (deserializedBody.getShortCode().isEmpty() ||
+                deserializedBody.getLongURL().isEmpty())
+            throw new Exception("One or more required fields are empty");
 
-        if (updateStatus) {
-            response.setStatus(200);
-            return "Update success";
-        } else
-            throw new IOException("Something went wrong");
+        boolean updateStatus = URLService.updateShortURL(deserializedBody.getShortCode(),
+                deserializedBody.getLongURL());
+
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("URL Update Success");
+
+        else
+            throw new Exception("URL Update Failed");
     }
 
     @RequestMapping(path = "/updateExpiry", method = RequestMethod.PATCH)
-    public String updateExpiryofShortCode(HttpServletResponse response,
-                                          @RequestBody ItemBody body) throws IOException, ParseException {
+    public ResponseEntity<String> updateExpiryOfShortCode(@RequestAttribute String requestBody)
+            throws Exception {
 
-        boolean updateStatus = databaseService.updateExpiry(body.shortURL, body.daysToAdd);
+        ItemBody body = helperService.deserializeJSONString(requestBody, ItemBody.class);
 
-        if (updateStatus) {
-            response.setStatus(200);
-            return "updated expiry successfully";
-        } else
-            throw new IOException("Something went wrong");
+        if (body.getShortURL().isEmpty() ||
+                body.getDaysToAdd() == 0)
+            throw new Exception("One or more required fields are empty");
+
+        boolean updateStatus = URLService.updateExpiry(body.getShortURL(), body.getDaysToAdd());
+
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");
+
+        else
+            throw new Exception("Expiry Update Failed");
+    }
+
+    @RequestMapping(path = "/deleteShortURL", method = RequestMethod.DELETE)
+    public ResponseEntity<String> deleteShortURL(@RequestAttribute String requestBody)
+            throws Exception {
+
+        LinkedHashMap<String, String> map = helperService.deserializeJSONString(requestBody, LinkedHashMap.class);
+
+        String shortURL = map.get("shortURL");
+
+        if (shortURL.isEmpty())
+            throw new Exception("Short URL is empty");
+
+        boolean updateStatus = URLService.deleteByShortURL(shortURL);
+
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");
+
+        else
+            throw new Exception("Expiry Update Failed");
     }
 
 }

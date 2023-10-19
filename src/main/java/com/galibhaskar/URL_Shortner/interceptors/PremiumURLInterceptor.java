@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
@@ -34,7 +35,8 @@ public class PremiumURLInterceptor implements HandlerInterceptor {
         PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
 
         if (!Objects.equals(deserializedBody.getUserType(), "pro")) {
-            response.sendError(HttpStatus.FORBIDDEN.value(), "Not a Premium User");
+//            response.setStatus(HttpStatus.FORBIDDEN.value());
+            response.sendError(HttpStatus.FORBIDDEN.value(),"Not a Premium User");
             return false;
         }
 

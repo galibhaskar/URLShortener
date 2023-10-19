@@ -1,6 +1,6 @@
 package com.galibhaskar.URL_Shortner.models;
 
-import com.opencsv.bean.CsvBindByName;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,17 +8,30 @@ import lombok.Setter;
 
 import java.util.Date;
 
+@Entity
+@Table(name = "short_urls_mapper")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ShortURL {
-    @CsvBindByName(column = "longURL")
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer Id;
+
+    @Column(name = "long_url")
     private String longURL;
 
-    @CsvBindByName(column = "shortCode")
+    @Column(name = "short_code")
     private String shortCode;
 
-    @CsvBindByName(column = "expiryDate")
-    private String expiryDate;
+    @Column(name = "expiry_date")
+    private Date expiryDate;
+
+    public ShortURL(String longURL, String shortCode, Date expiryDate) {
+        this.longURL = longURL;
+        this.shortCode = shortCode;
+        this.expiryDate = expiryDate;
+    }
 }

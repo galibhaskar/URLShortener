@@ -3,26 +3,21 @@ package com.galibhaskar.URL_Shortner.utils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.galibhaskar.URL_Shortner.concerns.IHelperService;
-import com.galibhaskar.URL_Shortner.models.ShortURL;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletRequestWrapper;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
 @Component
 public class HelperService implements IHelperService {
-    private static final String PATTERN = "MM-dd-yyyy";
+    private static final String PATTERN = "yyyy-MM-dd";
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat(PATTERN);
@@ -52,19 +47,15 @@ public class HelperService implements IHelperService {
         return dateFormat.format(date);
     }
 
-    public String getExtendedDate(String expiryDate, int daysToAddToExpiryDate)
+    public Date getExtendedDate(Date expiryDate, int daysToAddToExpiryDate)
             throws Exception {
-        Date convertedExpiryDate = parseDateString(expiryDate);
-
         Calendar calendar = Calendar.getInstance();
 
-        calendar.setTime(convertedExpiryDate);
+        calendar.setTime(expiryDate);
 
         calendar.add(Calendar.DAY_OF_MONTH, daysToAddToExpiryDate);
 
-        Date newDate = calendar.getTime();
-
-        return formatDateObject(newDate);
+        return calendar.getTime();
     }
 
     @Override

@@ -1,70 +1,63 @@
 package com.galibhaskar.URL_Shortner.services;
 
-import com.galibhaskar.URL_Shortner.concerns.ICSVService;
 import com.galibhaskar.URL_Shortner.concerns.IHelperService;
 import com.galibhaskar.URL_Shortner.models.ShortURL;
 import com.galibhaskar.URL_Shortner.concerns.IURLService;
+import com.galibhaskar.URL_Shortner.repositories.IURLRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
-public class URLService implements IURLService, ApplicationRunner {
-    final ICSVService csvService;
+public class URLService implements IURLService {
+    final IURLRepository urlRepository;
 
     final IHelperService helperService;
-
-    List<ShortURL> data;
 
     @Value("${shortCodeLength:5}")
     private int SHORT_CODE_LENGTH;
 
-    public URLService(@Autowired ICSVService csvService,
+    @Value("${defaultExpiryDate:30}")
+    private int DEFAULT_EXPIRY_DATE;
+
+    public URLService(@Autowired IURLRepository urlRepository,
                       @Autowired IHelperService helperService) {
-        this.csvService = csvService;
+        this.urlRepository = urlRepository;
+
         this.helperService = helperService;
     }
 
     @Override
     public ShortURL getURLInfo(String shortURL) throws Exception {
-        Optional<ShortURL> shortURLResult = this.data.stream()
-                .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
-                .findFirst();
-
-        if (shortURLResult.isPresent())
-            return shortURLResult.get();
-
-        throw new Exception("URL not found");
+        return urlRepository.findByShortCode(shortURL);
     }
 
     @Override
     public String getLongURL(String shortURL) throws Exception {
-        Date currentDate = new Date();
 
-        Optional<ShortURL> result = this.data.stream()
-                .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
-                .findFirst();
+        ShortURL validShortURL = urlRepository.findByShortCodeAndExpiryDateGreaterThan(shortURL, new Date());
 
-        if (result.isEmpty())
-            throw new RuntimeException("URL Not Found");
+        if (validShortURL == null)
+            throw new RuntimeException("URL EXPIRED/URL NOT FOUND");
+//        if (result.isEmpty())
+//            throw new RuntimeException("URL Not Found");
+//
+//        String expiryDate = result.get().getExpiryDate();
 
-        String expiryDate = result.get().getExpiryDate();
+//        Date convertedExpiryDate = helperService.parseDateString(expiryDate);
 
-        Date convertedExpiryDate = helperService.parseDateString(expiryDate);
+//        if (currentDate.after(convertedExpiryDate))
+//            throw new RuntimeException("URL Expired");
 
-        if (currentDate.after(convertedExpiryDate))
-            throw new RuntimeException("URL Expired");
+//            System.out.println(result);
 
-        return result.get().getLongURL();
+        return validShortURL.getLongURL();
     }
 
     @Override
-    public String createShortURL(String longURL, String expiry, String customShortCode)
+    public String createShortURL(String longURL, String customShortCode)
             throws Exception {
 
         String shortCode;
@@ -73,76 +66,57 @@ public class URLService implements IURLService, ApplicationRunner {
         else
             shortCode = customShortCode;
 
-        ShortURL shortURL = new ShortURL(longURL, shortCode, expiry);
+        Date todaysDate = new Date();
 
-        csvService.addItemToCSV(shortURL);
+        Date expiryDate = helperService.getExtendedDate(todaysDate, DEFAULT_EXPIRY_DATE);
 
-        this.data.add(shortURL);
+        ShortURL newShortURL = new ShortURL(longURL, shortCode, expiryDate);
+
+        urlRepository.save(newShortURL);
+
+        System.out.println("Generated the ID:" + newShortURL.getId());
 
         return shortCode;
     }
 
     @Override
-    public boolean updateShortURL(String shortURL, String longURL) throws Exception {
-        AtomicBoolean updateSuccess = new AtomicBoolean(false);
+    public boolean updateShortURL(String shortURL, String longURL) {
+        Integer modifiedRows = urlRepository.updateLongURLByShortURL(shortURL, longURL);
 
-        this.data.forEach(_urlItem -> {
-            if (Objects.equals(_urlItem.getShortCode(), shortURL)) {
-                _urlItem.setLongURL(longURL);
+        System.out.println("modifiedRows:" + modifiedRows);
 
-                updateSuccess.set(true);
-            }
-        });
-
-        csvService.writeToCSV(this.data);
-
-        return updateSuccess.get();
-    }
-
-    @Override
-    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) throws Exception {
-        Optional<ShortURL> result = this.data.stream()
-                .filter(_url -> Objects.equals(_url.getShortCode(), shortURL))
-                .findFirst();
-
-        if (result.isEmpty())
-            throw new Exception("URL not found");
-
-        String expiryDate = result.get().getExpiryDate();
-
-        String extendedDate = helperService.getExtendedDate(expiryDate, daysToAddToExpiryDate);
-
-        this.data.forEach(_urlItem -> {
-            if (Objects.equals(_urlItem.getShortCode(), shortURL)) {
-                _urlItem.setExpiryDate(extendedDate);
-            }
-        });
-
-        csvService.writeToCSV(this.data);
+        if (modifiedRows == 0)
+            throw new RuntimeException("Short URL Update Failed");
 
         return true;
     }
 
     @Override
-    public void deleteExpiredURLs() throws Exception {
-        this.data = this.data.stream().filter(_url -> {
-            Date urlExpiry = null;
-            try {
-                urlExpiry = helperService.parseDateString(_url.getExpiryDate());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            Date currentDate = new Date();
-            return !currentDate.after(urlExpiry);
-        }).toList();
+    public boolean updateExpiry(String shortURL, int daysToAddToExpiryDate) throws Exception {
+        ShortURL validShortURL = urlRepository.findByShortCode(shortURL);
 
-        csvService.writeToCSV(this.data);
+        Date newExpiryDate = helperService.getExtendedDate(validShortURL.getExpiryDate(), daysToAddToExpiryDate);
+
+        Integer modifiedRows = urlRepository.updateExpiryDateByShortURL(shortURL, newExpiryDate);
+
+        if (modifiedRows == 0)
+            throw new RuntimeException("Expiry Date Update Failed");
+
+        return true;
     }
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
-        this.data = csvService.readFromCSV();
+    public void deleteExpiredURLs() {
+        urlRepository.deleteByExpiryDateLessThan(new Date());
+    }
 
-        this.data.forEach(obj -> System.out.println(obj.getLongURL()));
+    @Override
+    public boolean deleteByShortURL(String shortURL) {
+        Integer modifiedRows = urlRepository.deleteByShortURL(shortURL);
+
+        if (modifiedRows == 0)
+            throw new RuntimeException("Delete Failed");
+
+        return true;
     }
 }

@@ -1,15 +1,8 @@
 package com.galibhaskar.URL_Shortner.concerns;
 
-import com.galibhaskar.URL_Shortner.models.ShortURL;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletRequestWrapper;
-import org.springframework.web.util.ContentCachingRequestWrapper;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.text.ParseException;
 import java.util.Date;
 
 public interface IHelperService {
@@ -19,7 +12,7 @@ public interface IHelperService {
 
     String formatDateObject(Date date) throws Exception;
 
-    String getExtendedDate(String expiryDate, int daysToAddToExpiryDate) throws Exception;
+    Date getExtendedDate(Date expiryDate, int daysToAddToExpiryDate) throws Exception;
 
     String extractRequestBody(HttpServletRequest request) throws IOException;
 

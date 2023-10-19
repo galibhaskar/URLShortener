@@ -14,8 +14,6 @@ import java.util.List;
 public class PremiumBody {
     private String destinationUrl;
 
-    private String expiryDate;
-
     private String slashTag;
 
     private String userType;

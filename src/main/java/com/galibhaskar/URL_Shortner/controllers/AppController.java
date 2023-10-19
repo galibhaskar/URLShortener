@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 
 @RestController
 public class AppController {
@@ -47,16 +48,14 @@ public class AppController {
         String currentHostName = request.getScheme() + "://" +
                 request.getHeader("Host") + "/";
 
-        ShortURL deserializedBody = helperService.deserializeJSONString(requestBody, ShortURL.class);
+        LinkedHashMap<String, String> map = helperService.deserializeJSONString(requestBody, LinkedHashMap.class);
 
-        if (deserializedBody.getLongURL().isEmpty() ||
-                deserializedBody.getExpiryDate().isEmpty())
-            throw new Exception("One or more required fields are empty");
+        String longURL = map.get("longURL");
 
-        String shortCode = URLService.createShortURL(
-                deserializedBody.getLongURL(),
-                deserializedBody.getExpiryDate(),
-                null);
+        if (longURL.isEmpty())
+            throw new Exception("longURL empty");
+
+        String shortCode = URLService.createShortURL(longURL, null);
 
         return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
     }
@@ -71,13 +70,11 @@ public class AppController {
         PremiumBody deserializedBody = helperService.deserializeJSONString(requestBody, PremiumBody.class);
 
         if (deserializedBody.getDestinationUrl().isEmpty() ||
-                deserializedBody.getExpiryDate().isEmpty() ||
                 deserializedBody.getSlashTag().isEmpty())
             throw new Exception("One or more required fields are empty");
 
         String shortCode = URLService.createShortURL(
                 deserializedBody.getDestinationUrl(),
-                deserializedBody.getExpiryDate(),
                 deserializedBody.getSlashTag());
 
         return ResponseEntity.status(HttpStatus.OK).body(currentHostName + shortCode);
@@ -113,6 +110,26 @@ public class AppController {
             throw new Exception("One or more required fields are empty");
 
         boolean updateStatus = URLService.updateExpiry(body.getShortURL(), body.getDaysToAdd());
+
+        if (updateStatus)
+            return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");
+
+        else
+            throw new Exception("Expiry Update Failed");
+    }
+
+    @RequestMapping(path = "/deleteShortURL", method = RequestMethod.DELETE)
+    public ResponseEntity<String> deleteShortURL(@RequestAttribute String requestBody)
+            throws Exception {
+
+        LinkedHashMap<String, String> map = helperService.deserializeJSONString(requestBody, LinkedHashMap.class);
+
+        String shortURL = map.get("shortURL");
+
+        if (shortURL.isEmpty())
+            throw new Exception("Short URL is empty");
+
+        boolean updateStatus = URLService.deleteByShortURL(shortURL);
 
         if (updateStatus)
             return ResponseEntity.status(HttpStatus.OK).body("Expiry Date Updated Successfully");
